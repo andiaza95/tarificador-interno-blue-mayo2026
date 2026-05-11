@@ -162,6 +162,9 @@ tr:hover td{background:var(--blue-light)}
 .btn-danger{padding:7px 14px;background:#fef2f2;color:var(--red);border:1.5px solid #fca5a5;
   border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
 .btn-danger:hover{background:var(--red);color:white}
+.btn-del-item{background:none;border:none;cursor:pointer;font-size:14px;color:#fca5a5;
+  padding:4px 6px;border-radius:6px;transition:all .2s;line-height:1;flex-shrink:0}
+.btn-del-item:hover{background:#fee2e2;color:var(--red)}
 
 .nota{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
 .nota strong{color:var(--text)}
@@ -286,12 +289,11 @@ tr:hover td{background:var(--blue-light)}
   <div class="card">
     <div class="card-title">📅 Historial de Actualizaciones de Tarifas</div>
     <div id="ajusteTimeline" class="ajuste-timeline"></div>
-    <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div>
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Multiplicador Acumulado</div>
         <div class="mult-badge" id="multBadge">×1.00 (+0%)</div>
       </div>
-      <button class="btn-danger" onclick="resetAjustes()" id="btnReset" style="display:none">🗑 Borrar ajustes extras</button>
     </div>
   </div>
 
@@ -458,25 +460,19 @@ function grabarAjuste(){
   calcular();
   calcularProd();
 }
-function resetAjustes(){
-  if(!confirm('¿Borrar todos los ajustes adicionales? (El ajuste base del 04-05-2026 se mantiene en los datos y no se elimina)')) return;
-  saveAjustesExtras([]);
-  renderHistorial();
-  renderTabla();
-  mostrarBadgeAjuste();
-  calcular();
-  calcularProd();
-}
 
 function renderHistorial(){
   const extras = getAjustesExtras();
   const all = [AJUSTE_BASE, ...extras];
   let html='';
-  all.forEach(a=>{
+  all.forEach((a, i)=>{
     const isUp=a.pct>0, isBase=!!a.base;
     const cls=isBase?'base':isUp?'up':'down';
     const icon=isBase?'📌':isUp?'▲':'▼';
     const signo=a.pct>0?'+':'';
+    // El índice en el array extras es i-1 (porque el primero es el base)
+    const extraIdx = i - 1;
+    const delBtn = isBase ? '' : `<button class="btn-del-item" onclick="borrarAjuste(${extraIdx})" title="Eliminar este ajuste">🗑</button>`;
     html+=`<div class="ajuste-item">
       <div class="ajuste-dot ${cls}">${icon}</div>
       <div class="ajuste-body">
@@ -484,11 +480,28 @@ function renderHistorial(){
         <div class="ajuste-desc">${a.desc}</div>
       </div>
       <div class="ajuste-pct ${cls}">${signo}${a.pct}%</div>
+      ${delBtn}
     </div>`;
   });
+  if(extras.length===0){
+    html += `<div style="padding:10px 0;font-size:13px;color:var(--muted)">No hay ajustes adicionales registrados.</div>`;
+  }
   document.getElementById('ajusteTimeline').innerHTML=html;
-  const btnReset=document.getElementById('btnReset');
-  if(btnReset) btnReset.style.display=extras.length>0?'':'none';
+}
+
+function borrarAjuste(idx){
+  const arr = getAjustesExtras();
+  const item = arr[idx];
+  if(!item) return;
+  const signo = item.pct>0?'+':'';
+  if(!confirm(`¿Eliminar el ajuste del ${item.fecha} (${signo}${item.pct}%)?`)) return;
+  arr.splice(idx, 1);
+  saveAjustesExtras(arr);
+  renderHistorial();
+  renderTabla();
+  mostrarBadgeAjuste();
+  calcular();
+  calcularProd();
 }
 
 function mostrarBadgeAjuste(){
